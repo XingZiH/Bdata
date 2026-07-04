@@ -492,14 +492,17 @@ function renderSectorCompanies(theme) {
   const rows = theme.companies.map(([code, fallbackName, reason]) => {
     const stock = stockMap.get(code);
     const quote = quoteFor(code);
+    const name = stock?.name || fallbackName;
+    const exchange = stock?.exchange || inferExchange(code);
     return {
       code,
-      name: stock?.name || fallbackName,
-      exchange: stock?.exchange || inferExchange(code),
+      name,
+      exchange,
       reason,
       quote,
     };
-  }).filter((item) => priceMatches(item.quote?.price, filters));
+  }).filter((item) => isTradableAStockCandidate(item.code, item.name, item.exchange))
+    .filter((item) => priceMatches(item.quote?.price, filters));
   $("sectorCompanyTitle").textContent = `${theme.name} · 公司池`;
   $("sectorCompanyCount").textContent = `${rows.length} 家候选 · 热度 ${theme.heat} · ${theme.risk}`;
   body.innerHTML = "";
@@ -525,6 +528,17 @@ function inferExchange(code) {
   if (code.startsWith("6")) return "SH";
   if (code.startsWith("8") || code.startsWith("9")) return "BJ";
   return "SZ";
+}
+
+function isTradableAStockCandidate(code, name = "", exchange = "") {
+  const normalizedCode = String(code || "").trim();
+  const normalizedName = String(name || "").trim().toUpperCase();
+  const normalizedExchange = String(exchange || "").trim().toUpperCase();
+  if (!normalizedCode) return false;
+  if (normalizedExchange === "HK") return false;
+  if (normalizedCode.startsWith("688")) return false;
+  if (/\bST\b|\*ST|退市/.test(normalizedName)) return false;
+  return /^(0|3|6|8|9)/.test(normalizedCode);
 }
 
 function priceMatches(value, filters) {
@@ -555,6 +569,7 @@ function buildRecommendationRows() {
         seen.add(code);
         const stock = stockMap.get(code);
         const quote = quoteFor(code);
+        if (!isTradableAStockCandidate(code, stock?.name || fallbackName, stock?.exchange || inferExchange(code))) return;
         if (!priceMatches(quote?.price, filters)) return;
         const knownPriceBonus = quote?.price ? 8 : 0;
         const priceBonus = quote?.price && filters.maxPrice && quote.price <= filters.maxPrice ? 8 : 0;

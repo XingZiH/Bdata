@@ -53,3 +53,10 @@ test("provides user-facing sector filters, prices, and AI stock recommendations"
   assert.match(js, /function runAISectorScan/);
   assert.match(js, /function renderRecommendations/);
 });
+
+test("filters non-target A-share candidates from discovery recommendations", () => {
+  assert.match(js, /function isTradableAStockCandidate/);
+  assert.match(js, /startsWith\("688"\)/);
+  assert.match(js, /\bST\b/);
+  assert.match(js, /isTradableAStockCandidate\(code, stock\?\.name \|\| fallbackName/);
+});

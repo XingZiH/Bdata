@@ -168,7 +168,7 @@ func BuildPrompt(req AnalysisRequest) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("encode analysis context: %w", err)
 	}
-	system := "你是A股量化交易与风控分析助手。只基于用户提供的数据做研究型分析，不承诺收益，不编造实时新闻，不把未来数据当作已知事实。输出要短、可执行、先风险后机会。"
+	system := systemPromptForMode(mode)
 	if mode == "sector" {
 		user := fmt.Sprintf(`请对 %s %s 做本月板块趋势和候选股筛选。
 
