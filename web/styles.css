@@ -574,6 +574,68 @@ input {
   font-size: 19px;
 }
 
+.ai-monitor {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.ai-monitor-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+}
+
+.monitor-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.monitor-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.monitor-buttons button {
+  font-weight: 700;
+}
+
+.monitor-buttons button:last-child {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--inverse);
+}
+
+.monitor-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-insight {
+  min-height: 124px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.monitor-table-wrap {
+  max-height: 260px;
+}
+
 .insight-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
@@ -732,6 +794,7 @@ tbody tr:hover {
   }
 
   .advice-board,
+  .ai-monitor-grid,
   .chart-grid {
     grid-template-columns: 1fr;
   }
@@ -800,6 +863,10 @@ tbody tr:hover {
 
   .sector-select {
     width: 100%;
+  }
+
+  .monitor-buttons {
+    grid-template-columns: 1fr;
   }
 
   .card-head {

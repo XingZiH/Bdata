@@ -11,6 +11,7 @@
 - 未来几日预测：基于历史相似样本的区间分布，并使用 walk-forward 做方向命中率和误差评估。
 - 决策面板：直接输出当前动作、买入区、确认线、不追线、止损、硬止损、止盈、建议股数和资金不足提示。
 - 在线选股中心：启动后先进入股票池菜单，按代码、名称或交易所搜索，点击“分析”进入回测工作台。
+- AI 实时盯盘：接入本地 OpenAI-compatible 接口，对盯盘池、最新 K 线、回测建议和预测分布做在线分析。
 - 暗黑模式：右上角可切换浅色/暗黑主题，设置会保存在浏览器本地。
 
 ## 运行环境
@@ -27,6 +28,21 @@ pip install adata pandas requests yfinance
 
 ```bash
 set ADATA_PYTHON=C:\Path\To\python.exe
+```
+
+本地 AI 接口默认使用：
+
+```text
+LOCAL_OP_BASE_URL=http://192.168.0.109:50990/v1
+LOCAL_OP_MODEL=gpt-5.5
+```
+
+如需覆盖：
+
+```bash
+set LOCAL_OP_BASE_URL=http://192.168.0.109:50990/v1
+set LOCAL_OP_MODEL=gpt-5.5
+set LOCAL_OP_API_KEY=服务要求鉴权时填写实际 key
 ```
 
 ## 启动
@@ -60,6 +76,8 @@ GET  /api/health
 GET  /api/stocks?q=华天&limit=300
 GET  /api/market?code=002185&start=2024-01-01
 POST /api/backtest
+GET  /api/ai/config
+POST /api/ai/analyze
 ```
 
 `POST /api/backtest` 示例：
@@ -74,6 +92,20 @@ POST /api/backtest
   "feeRate": 0.0003,
   "slippageRate": 0.0005,
   "forecastDays": 3
+}
+```
+
+`POST /api/ai/analyze` 示例：
+
+```json
+{
+  "code": "002185",
+  "name": "华天科技",
+  "mode": "watch",
+  "context": {
+    "latest": {"close": 12.34, "changePct": 1.2},
+    "advice": {"actionLabel": "等确认"}
+  }
 }
 ```
 

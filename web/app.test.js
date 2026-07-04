@@ -31,3 +31,12 @@ test("provides sector discovery from hot themes and news events", () => {
   assert.match(js, /function selectSector/);
   assert.match(js, /function renderSectorCompanies/);
 });
+
+test("provides local AI monitor controls and analysis flow", () => {
+  assert.match(html, /id="aiMonitorStatus"/);
+  assert.match(html, /id="watchBody"/);
+  assert.match(html, /id="aiInsight"/);
+  assert.match(js, /function startMonitor/);
+  assert.match(js, /function refreshWatchlist/);
+  assert.match(js, /\/api\/ai\/analyze/);
+});

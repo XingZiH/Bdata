@@ -5,9 +5,34 @@ const state = {
   filteredStocks: [],
   currentPage: "stock",
   selectedSector: "",
+  watchlist: loadSavedWatchlist(),
+  watchSnapshots: {},
+  monitorTimer: null,
+  monitorRunning: false,
+  aiConfig: null,
 };
 
 const $ = (id) => document.getElementById(id);
+
+function loadSavedWatchlist() {
+  try {
+    const rows = JSON.parse(localStorage.getItem("adata-watchlist") || "[]");
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter((item) => item && String(item.code || "").trim())
+      .slice(0, 20)
+      .map((item) => ({
+        code: String(item.code).trim(),
+        name: String(item.name || "").trim(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function saveWatchlist() {
+  localStorage.setItem("adata-watchlist", JSON.stringify(state.watchlist.slice(0, 20)));
+}
 
 const sectorThemes = [
   {
@@ -263,6 +288,18 @@ async function fetchJSON(url, options) {
   return payload;
 }
 
+async function loadAIConfig() {
+  try {
+    const cfg = await fetchJSON("/api/ai/config");
+    state.aiConfig = cfg;
+    $("aiMonitorStatus").textContent = cfg.apiKeyConfigured
+      ? `${cfg.model} · ${cfg.baseURL}`
+      : `${cfg.model} · 等待 LOCAL_OP_API_KEY`;
+  } catch (err) {
+    $("aiMonitorStatus").textContent = `AI 配置失败：${err.message}`;
+  }
+}
+
 async function loadStocks(query = "", limit = 5000) {
   status("正在加载在线股票列表...");
   const payload = await fetchJSON(`/api/stocks?q=${encodeURIComponent(query)}&limit=${limit}`);
@@ -471,9 +508,240 @@ function selectStock(code, name) {
   runBacktest();
 }
 
+function currentStockMeta() {
+  const code = $("codeInput").value.trim();
+  const stock = state.stocks.find((item) => item.code === code);
+  return { code, name: stock?.name || "" };
+}
+
+function ensureWatchItem(code, name = "") {
+  code = String(code || "").trim();
+  if (!code) return;
+  const existing = state.watchlist.find((item) => item.code === code);
+  if (existing) {
+    if (name && !existing.name) existing.name = name;
+  } else {
+    state.watchlist.unshift({ code, name });
+    state.watchlist = state.watchlist.slice(0, 20);
+  }
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function removeWatchItem(code) {
+  state.watchlist = state.watchlist.filter((item) => item.code !== code);
+  delete state.watchSnapshots[code];
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function renderWatchlist() {
+  const body = $("watchBody");
+  body.innerHTML = "";
+  if (!state.watchlist.length) {
+    body.innerHTML = `<tr><td colspan="7">暂无盯盘标的</td></tr>`;
+    return;
+  }
+  state.watchlist.forEach((item) => {
+    const snapshot = state.watchSnapshots[item.code] || {};
+    const cls = snapshot.changePct >= 0 ? "positive" : "negative";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.code}</td>
+      <td>${item.name || "--"}</td>
+      <td>${snapshot.close ? price(snapshot.close) : "--"}</td>
+      <td class="${Number.isFinite(snapshot.changePct) ? cls : ""}">${formatWatchChange(snapshot.changePct)}</td>
+      <td>${snapshot.signal || snapshot.error || "等待刷新"}</td>
+      <td>${snapshot.updatedAt || "--"}</td>
+      <td><button class="stock-action" data-watch-remove="${item.code}" type="button">移除</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function formatWatchChange(value) {
+  if (!Number.isFinite(value)) return "--";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function monitorStartDate() {
+  const year = new Date().getFullYear() - 1;
+  return `${year}-01-01`;
+}
+
+async function refreshWatchlist() {
+  if (!state.watchlist.length) {
+    renderWatchlist();
+    $("aiMonitorStatus").textContent = state.aiConfig ? `${state.aiConfig.model} · 无盯盘标的` : "无盯盘标的";
+    return;
+  }
+  $("aiMonitorStatus").textContent = state.monitorRunning ? "盯盘刷新中..." : "手动刷新中...";
+  const start = monitorStartDate();
+  const results = await Promise.allSettled(
+    state.watchlist.map(async (item) => {
+      const payload = await fetchJSON(`/api/market?code=${encodeURIComponent(item.code)}&start=${start}`);
+      const bars = payload.bars || [];
+      if (!bars.length) throw new Error("无行情");
+      state.watchSnapshots[item.code] = buildWatchSnapshot(item, bars);
+    })
+  );
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      const item = state.watchlist[index];
+      state.watchSnapshots[item.code] = {
+        error: result.reason?.message || "刷新失败",
+        updatedAt: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
+      };
+    }
+  });
+  renderWatchlist();
+  const failed = results.filter((item) => item.status === "rejected").length;
+  const model = state.aiConfig?.model || "AI";
+  $("aiMonitorStatus").textContent = failed ? `${model} · ${failed} 个标的刷新失败` : `${model} · ${state.watchlist.length} 个标的已刷新`;
+}
+
+function buildWatchSnapshot(item, bars) {
+  const last = bars[bars.length - 1];
+  const prev = bars.length > 1 ? bars[bars.length - 2] : null;
+  let changePct = Number(last.changePct);
+  if (!Number.isFinite(changePct) && prev?.close > 0) {
+    changePct = (last.close / prev.close - 1) * 100;
+  }
+  const volumeRatio = prev?.volume > 0 ? last.volume / prev.volume - 1 : 0;
+  return {
+    code: item.code,
+    name: item.name,
+    date: last.date,
+    close: last.close,
+    high: last.high,
+    low: last.low,
+    volume: last.volume,
+    changePct,
+    signal: classifyWatchSignal(changePct, volumeRatio, last, prev),
+    updatedAt: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
+  };
+}
+
+function classifyWatchSignal(changePct, volumeRatio, last, prev) {
+  if (!prev || !Number.isFinite(changePct)) return "数据不足";
+  if (changePct >= 3 && volumeRatio > 0.2) return "放量强势";
+  if (changePct >= 1.2) return "偏强观察";
+  if (changePct <= -3 && volumeRatio > 0.2) return "放量转弱";
+  if (changePct <= -1.2) return "回落防守";
+  const range = last.close > 0 ? (last.high - last.low) / last.close : 0;
+  if (range > 0.06) return "波动扩大";
+  return "窄幅震荡";
+}
+
+function startMonitor() {
+  if (state.monitorTimer) clearInterval(state.monitorTimer);
+  const seconds = Math.min(300, Math.max(15, Number($("monitorIntervalInput").value) || 45));
+  $("monitorIntervalInput").value = seconds;
+  state.monitorRunning = true;
+  refreshWatchlist().catch((err) => {
+    $("aiMonitorStatus").textContent = err.message;
+  });
+  state.monitorTimer = setInterval(() => {
+    refreshWatchlist().catch((err) => {
+      $("aiMonitorStatus").textContent = err.message;
+    });
+  }, seconds * 1000);
+}
+
+function stopMonitor() {
+  if (state.monitorTimer) clearInterval(state.monitorTimer);
+  state.monitorTimer = null;
+  state.monitorRunning = false;
+  $("aiMonitorStatus").textContent = state.aiConfig ? `${state.aiConfig.model} · 已暂停` : "已暂停";
+}
+
+function buildAIContext() {
+  const current = currentStockMeta();
+  const sector = sectorThemes.find((theme) => theme.companies.some(([code]) => code === current.code));
+  const payload = state.response || {};
+  const recent = recentBars(payload.bars || [], 45).map((bar) => ({
+    date: bar.date,
+    open: bar.open,
+    high: bar.high,
+    low: bar.low,
+    close: bar.close,
+    volume: bar.volume,
+    fastMA: bar.fastMA,
+    slowMA: bar.slowMA,
+    ma20: bar.ma20,
+    ma60: bar.ma60,
+    rsi14: bar.rsi14,
+    macdHist: bar.macdHist,
+    volumeRatio20: bar.volumeRatio20,
+  }));
+  return {
+    generatedAt: new Date().toISOString(),
+    current,
+    sector: sector
+      ? {
+          name: sector.name,
+          heat: sector.heat,
+          risk: sector.risk,
+          catalyst: sector.catalyst,
+          source: sector.source,
+        }
+      : null,
+    monitor: {
+      running: state.monitorRunning,
+      snapshots: state.watchlist.map((item) => state.watchSnapshots[item.code] || { code: item.code, name: item.name }),
+    },
+    backtest: {
+      request: payload.request || requestFromForm(),
+      metrics: payload.metrics || null,
+      advice: payload.advice || null,
+      forecast: payload.forecast || null,
+      recentBars: recent,
+    },
+  };
+}
+
+async function runAIAnalysis() {
+  const current = currentStockMeta();
+  if (!current.code) {
+    $("aiInsight").textContent = "请先选择股票";
+    return;
+  }
+  ensureWatchItem(current.code, current.name);
+  $("aiAnalyzeBtn").disabled = true;
+  $("aiInsight").textContent = "AI 分析中...";
+  try {
+    if (!state.watchSnapshots[current.code]) {
+      await refreshWatchlist();
+    }
+    const payload = await fetchJSON("/api/ai/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: current.code,
+        name: current.name,
+        mode: "watch",
+        context: buildAIContext(),
+      }),
+    });
+    $("aiInsight").textContent = payload.content || "AI 未返回内容";
+    $("aiMonitorStatus").textContent = `${payload.model || state.aiConfig?.model || "AI"} · ${new Date(payload.createdAt || Date.now()).toLocaleTimeString("zh-CN", { hour12: false })}`;
+  } catch (err) {
+    $("aiInsight").textContent = `AI 分析失败：${err.message}`;
+    $("aiMonitorStatus").textContent = "AI 调用失败";
+  } finally {
+    $("aiAnalyzeBtn").disabled = false;
+  }
+}
+
 function renderAll(payload) {
   const matched = state.stocks.find((item) => item.code === payload.request.code);
   $("pageTitle").textContent = `${payload.request.code}${matched?.name ? ` · ${matched.name}` : ""} · 在线回测与三日预测`;
+  ensureWatchItem(payload.request.code, matched?.name || "");
+  if (!state.watchSnapshots[payload.request.code]) {
+    refreshWatchlist().catch((err) => {
+      $("aiMonitorStatus").textContent = err.message;
+    });
+  }
   renderAdvice(payload.advice || {});
   renderMetrics(payload.metrics || {}, payload.forecast || {});
   renderKChart(payload);
@@ -875,6 +1143,11 @@ $("sectorCompanyBody").addEventListener("click", (event) => {
   if (!button) return;
   selectStock(button.dataset.code, button.dataset.name);
 });
+$("watchBody").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-watch-remove]");
+  if (!button) return;
+  removeWatchItem(button.dataset.watchRemove);
+});
 ["hotSectorGrid", "newsSectorGrid"].forEach((id) => {
   $(id).addEventListener("click", (event) => {
     const button = event.target.closest("button[data-sector]");
@@ -882,6 +1155,20 @@ $("sectorCompanyBody").addEventListener("click", (event) => {
     selectSector(button.dataset.sector);
   });
 });
+$("addWatchBtn").addEventListener("click", () => {
+  const current = currentStockMeta();
+  if (!current.code) {
+    $("aiInsight").textContent = "请先选择股票";
+    return;
+  }
+  ensureWatchItem(current.code, current.name);
+  refreshWatchlist().catch((err) => {
+    $("aiMonitorStatus").textContent = err.message;
+  });
+});
+$("startMonitorBtn").addEventListener("click", startMonitor);
+$("stopMonitorBtn").addEventListener("click", stopMonitor);
+$("aiAnalyzeBtn").addEventListener("click", runAIAnalysis);
 
 const initialParams = new URLSearchParams(window.location.search);
 const initialCode = initialParams.get("code");
@@ -890,6 +1177,8 @@ if (initialCode) {
 }
 
 initTheme();
+renderWatchlist();
+loadAIConfig();
 if (initialCode && initialParams.get("run") === "1") {
   showPage("analysis");
   loadStocks()

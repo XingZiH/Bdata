@@ -197,6 +197,44 @@
 
           <section class="metrics" id="metricsGrid"></section>
 
+          <section class="ai-monitor">
+            <div class="card-head">
+              <h3>AI 实时盯盘</h3>
+              <span id="aiMonitorStatus">AI 未连接</span>
+            </div>
+            <div class="ai-monitor-grid">
+              <div class="monitor-controls">
+                <div class="monitor-buttons">
+                  <button id="addWatchBtn" type="button">加入盯盘</button>
+                  <button id="startMonitorBtn" type="button">开始盯盘</button>
+                  <button id="stopMonitorBtn" type="button">暂停</button>
+                  <button id="aiAnalyzeBtn" type="button">AI 分析</button>
+                </div>
+                <label>
+                  刷新间隔
+                  <input id="monitorIntervalInput" type="number" min="15" max="300" value="45" />
+                </label>
+              </div>
+              <div class="ai-insight" id="aiInsight">等待 AI 分析</div>
+            </div>
+            <div class="table-wrap monitor-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>最新K线</th>
+                    <th>涨跌</th>
+                    <th>盯盘信号</th>
+                    <th>更新时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="watchBody"></tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="insight-grid">
             <div class="insight-card">
               <div class="card-head compact-head">

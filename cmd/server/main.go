@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	localai "adata-backtest-lab/internal/ai"
 	"adata-backtest-lab/internal/data"
 	"adata-backtest-lab/internal/engine"
 )
@@ -20,6 +22,7 @@ import (
 type app struct {
 	root     string
 	provider data.Provider
+	ai       *localai.Client
 }
 
 func main() {
@@ -32,6 +35,7 @@ func main() {
 	a := &app{
 		root:     root,
 		provider: data.NewADataProvider(root),
+		ai:       localai.NewClient(localai.ConfigFromEnv()),
 	}
 
 	mux := http.NewServeMux()
@@ -39,6 +43,8 @@ func main() {
 	mux.HandleFunc("/api/stocks", a.handleStocks)
 	mux.HandleFunc("/api/market", a.handleMarket)
 	mux.HandleFunc("/api/backtest", a.handleBacktest)
+	mux.HandleFunc("/api/ai/config", a.handleAIConfig)
+	mux.HandleFunc("/api/ai/analyze", a.handleAIAnalyze)
 	mux.Handle("/", http.FileServer(http.Dir(filepath.Join(root, "web"))))
 
 	server := &http.Server{
@@ -98,6 +104,40 @@ func (a *app) handleBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := engine.RunBacktest(req, bars)
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (a *app) handleAIConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, errors.New("GET required"))
+		return
+	}
+	cfg := a.ai.Config()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"baseURL":          cfg.BaseURL,
+		"model":            cfg.Model,
+		"enabled":          true,
+		"apiKeyConfigured": cfg.APIKey != "",
+	})
+}
+
+func (a *app) handleAIAnalyze(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, errors.New("POST required"))
+		return
+	}
+	var req localai.AnalysisRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, fmt.Errorf("decode request: %w", err))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 100*time.Second)
+	defer cancel()
+	resp, err := a.ai.Analyze(ctx, req)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
