@@ -26,6 +26,25 @@ def fallback_stocks() -> list[dict]:
     ]
 
 
+def snapshot_stocks() -> list[dict]:
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "stocks_snapshot.json"))
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        items = payload.get("items", payload) if isinstance(payload, dict) else payload
+        if not isinstance(items, list):
+            return []
+        rows = []
+        for item in items:
+            code = str(item.get("code", "")).strip().zfill(6)
+            name = str(item.get("name", "")).strip()
+            if code and name:
+                rows.append({"code": code, "name": name, "exchange": str(item.get("exchange", ""))})
+        return rows
+    except Exception:
+        return []
+
+
 def normalize_code(code: str) -> str:
     code = code.strip().upper()
     if "." in code:
@@ -44,6 +63,10 @@ def run_stocks(_: argparse.Namespace) -> None:
     east = load_stocks_eastmoney()
     if east:
         emit({"items": east, "source": "eastmoney-fast-list"})
+        return
+    snapshot = snapshot_stocks()
+    if snapshot:
+        emit({"items": snapshot, "source": "snapshot"})
         return
     try:
         import adata
