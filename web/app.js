@@ -10,6 +10,8 @@ const state = {
   monitorTimer: null,
   monitorRunning: false,
   aiConfig: null,
+  quotes: {},
+  recommendations: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -219,6 +221,13 @@ const sectorThemes = [
   },
 ];
 
+const monthMarketNotes = [
+  "7月3日A股反弹，机器人概念爆发，军工、汽车、医药、黄金等方向活跃；半导体板块短线调整。",
+  "7月进入中报预告窗口，资金从单纯景气预期转向业绩兑现验证。",
+  "7月策略继续关注国产算力、AI硬件和有色金属，但科技线拥挤度较高，需要控制追高。",
+  "贵金属、减速器、机器人、电机、国防军工等方向近期涨幅居前，强势板块也需要观察量价承接。",
+];
+
 function pct(value, digits = 2) {
   if (!Number.isFinite(value)) return "--";
   return `${(value * 100).toFixed(digits)}%`;
@@ -306,8 +315,13 @@ async function loadStocks(query = "", limit = 5000) {
   const items = payload.items || [];
   state.stocks = items;
   fillDatalist(items);
+  fillSectorFilter();
   applyStockFilter();
   renderSectorCards();
+  applyDiscoveryFilters(false);
+  refreshCandidateQuotes(8, 4).catch((err) => {
+    $("recommendationSummary").textContent = `价格刷新失败：${err.message}`;
+  });
   if (!state.selectedSector && sectorThemes.length) {
     selectSector(sectorThemes[0].id);
   } else if (state.selectedSector) {
@@ -327,6 +341,32 @@ function fillDatalist(items) {
   });
 }
 
+function fillSectorFilter() {
+  const select = $("sectorFilterSelect");
+  const current = select.value;
+  select.innerHTML = `<option value="">全部板块</option>`;
+  sectorThemes.forEach((theme) => {
+    const option = document.createElement("option");
+    option.value = theme.id;
+    option.textContent = theme.name;
+    select.appendChild(option);
+  });
+  if (current && sectorThemes.some((theme) => theme.id === current)) {
+    select.value = current;
+  }
+}
+
+function quoteFor(code) {
+  return state.quotes[code] || null;
+}
+
+function quoteText(code) {
+  const quote = quoteFor(code);
+  if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) return "--";
+  const change = Number.isFinite(quote.changePct) ? ` ${quote.changePct >= 0 ? "+" : ""}${quote.changePct.toFixed(2)}%` : "";
+  return `${price(quote.price)}${change}`;
+}
+
 function applyStockFilter() {
   const q = $("stockSearchInput").value.trim().toLowerCase();
   state.filteredStocks = state.stocks.filter((item) => {
@@ -342,7 +382,7 @@ function renderStockTable(items) {
   $("stockCount").textContent = countText;
   body.innerHTML = "";
   if (!items.length) {
-    body.innerHTML = `<tr><td colspan="4">没有匹配的股票，换个代码或名称试试</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5">没有匹配的股票，换个代码或名称试试</td></tr>`;
     return;
   }
   items.slice(0, 500).forEach((item) => {
@@ -351,6 +391,7 @@ function renderStockTable(items) {
       <td>${item.code}</td>
       <td>${item.name || "--"}</td>
       <td>${item.exchange || "--"}</td>
+      <td>${quoteText(item.code)}</td>
       <td><button class="stock-action" data-code="${item.code}" data-name="${item.name || ""}" type="button">分析</button></td>
     `;
     body.appendChild(tr);
@@ -358,19 +399,52 @@ function renderStockTable(items) {
 }
 
 function renderSectorCards() {
+  const filters = getDiscoveryFilters();
+  const themes = sectorThemes.filter((theme) => themeMatchesFilters(theme, filters));
   renderThemeCards(
     "hotSectorGrid",
-    sectorThemes.filter((theme) => theme.type === "hot")
+    themes.filter((theme) => theme.type === "hot")
   );
   renderThemeCards(
     "newsSectorGrid",
-    sectorThemes.filter((theme) => theme.type === "news")
+    themes.filter((theme) => theme.type === "news")
   );
+}
+
+function getDiscoveryFilters() {
+  return {
+    sectorId: $("sectorFilterSelect")?.value || "",
+    minPrice: Number($("minPriceInput")?.value) || 0,
+    maxPrice: Number($("maxPriceInput")?.value) || 0,
+    risk: $("riskFilterSelect")?.value || "",
+    minHeat: Number($("minHeatInput")?.value) || 0,
+  };
+}
+
+function themeMatchesFilters(theme, filters) {
+  if (filters.sectorId && theme.id !== filters.sectorId) return false;
+  if (filters.minHeat && theme.heat < filters.minHeat) return false;
+  if (filters.risk && !riskMatches(theme.risk, filters.risk)) return false;
+  return true;
+}
+
+function riskMatches(risk, target) {
+  const text = String(risk || "");
+  const high = /高波动|拥挤|事件|兑现|跟随商品|产业验证|财报|分化/.test(text);
+  const low = /防守|进攻性弱|稳健|红利/.test(text);
+  if (target === "high") return high;
+  if (target === "low") return low;
+  if (target === "medium") return !high || /分化|产业验证|财报/.test(text);
+  return true;
 }
 
 function renderThemeCards(targetId, themes) {
   const box = $(targetId);
   box.innerHTML = "";
+  if (!themes.length) {
+    box.innerHTML = `<div class="empty-card">没有匹配的板块</div>`;
+    return;
+  }
   themes.forEach((theme) => {
     const card = document.createElement("article");
     card.className = `sector-card ${theme.type === "news" ? "event-card" : ""} ${
@@ -396,8 +470,12 @@ function selectSector(id) {
   const theme = sectorThemes.find((item) => item.id === id);
   if (!theme) return;
   state.selectedSector = id;
+  if ($("sectorFilterSelect") && !$("sectorFilterSelect").value) {
+    $("sectorFilterSelect").value = id;
+  }
   renderSectorCards();
   renderSectorCompanies(theme);
+  renderRecommendations();
   status(`已选择板块：${theme.name}，可从公司池直接进入回测`);
 }
 
@@ -406,28 +484,36 @@ function renderSectorCompanies(theme) {
   if (!theme) {
     $("sectorCompanyTitle").textContent = "板块公司池";
     $("sectorCompanyCount").textContent = "先选择板块";
-    body.innerHTML = `<tr><td colspan="5">先选择一个热门板块或新闻事件</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6">先选择一个热门板块或新闻事件</td></tr>`;
     return;
   }
+  const filters = getDiscoveryFilters();
   const stockMap = new Map(state.stocks.map((item) => [item.code, item]));
   const rows = theme.companies.map(([code, fallbackName, reason]) => {
     const stock = stockMap.get(code);
+    const quote = quoteFor(code);
     return {
       code,
       name: stock?.name || fallbackName,
       exchange: stock?.exchange || inferExchange(code),
       reason,
+      quote,
     };
-  });
+  }).filter((item) => priceMatches(item.quote?.price, filters));
   $("sectorCompanyTitle").textContent = `${theme.name} · 公司池`;
   $("sectorCompanyCount").textContent = `${rows.length} 家候选 · 热度 ${theme.heat} · ${theme.risk}`;
   body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="6">当前价格和风险条件下暂无匹配股票</td></tr>`;
+    return;
+  }
   rows.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${item.code}</td>
       <td>${item.name}</td>
       <td>${item.exchange}</td>
+      <td>${quoteText(item.code)}</td>
       <td>${item.reason}</td>
       <td><button class="stock-action" data-code="${item.code}" data-name="${item.name}" type="button">分析</button></td>
     `;
@@ -439,6 +525,128 @@ function inferExchange(code) {
   if (code.startsWith("6")) return "SH";
   if (code.startsWith("8") || code.startsWith("9")) return "BJ";
   return "SZ";
+}
+
+function priceMatches(value, filters) {
+  if (!Number.isFinite(value) || value <= 0) return true;
+  if (filters.minPrice && value < filters.minPrice) return false;
+  if (filters.maxPrice && value > filters.maxPrice) return false;
+  return true;
+}
+
+function riskPenalty(risk) {
+  const text = String(risk || "");
+  if (/拥挤|高波动|题材兑现/.test(text)) return 12;
+  if (/事件|产业验证|跟随商品|财报|分化/.test(text)) return 8;
+  if (/进攻性弱|防守|红利/.test(text)) return 3;
+  return 5;
+}
+
+function buildRecommendationRows() {
+  const filters = getDiscoveryFilters();
+  const stockMap = new Map(state.stocks.map((item) => [item.code, item]));
+  const rows = [];
+  const seen = new Set();
+  sectorThemes
+    .filter((theme) => themeMatchesFilters(theme, filters))
+    .forEach((theme) => {
+      theme.companies.forEach(([code, fallbackName, reason]) => {
+        if (seen.has(code)) return;
+        seen.add(code);
+        const stock = stockMap.get(code);
+        const quote = quoteFor(code);
+        if (!priceMatches(quote?.price, filters)) return;
+        const knownPriceBonus = quote?.price ? 8 : 0;
+        const priceBonus = quote?.price && filters.maxPrice && quote.price <= filters.maxPrice ? 8 : 0;
+        const momentumBonus = quote?.changePct >= 0 ? Math.min(8, quote.changePct) : Math.max(-8, quote?.changePct || 0);
+        const score = Math.round(theme.heat + knownPriceBonus + priceBonus + momentumBonus - riskPenalty(theme.risk));
+        rows.push({
+          code,
+          name: stock?.name || fallbackName,
+          exchange: stock?.exchange || inferExchange(code),
+          sector: theme.name,
+          heat: theme.heat,
+          risk: theme.risk,
+          reason,
+          catalyst: theme.catalyst,
+          source: theme.source,
+          quote,
+          score,
+        });
+      });
+    });
+  return rows.sort((a, b) => b.score - a.score).slice(0, 20);
+}
+
+function applyDiscoveryFilters(shouldRefreshPrices = false) {
+  renderSectorCards();
+  const selected = sectorThemes.find((theme) => theme.id === state.selectedSector);
+  if (selected && themeMatchesFilters(selected, getDiscoveryFilters())) {
+    renderSectorCompanies(selected);
+  } else {
+    const first = sectorThemes.find((theme) => themeMatchesFilters(theme, getDiscoveryFilters()));
+    state.selectedSector = first?.id || "";
+    renderSectorCompanies(first);
+  }
+  renderRecommendations();
+  if (shouldRefreshPrices) {
+    refreshCandidateQuotes().catch((err) => {
+      $("recommendationSummary").textContent = `价格刷新失败：${err.message}`;
+    });
+  }
+}
+
+function renderRecommendations() {
+  const rows = buildRecommendationRows();
+  state.recommendations = rows;
+  const body = $("recommendationBody");
+  body.innerHTML = "";
+  $("recommendationSummary").textContent = rows.length ? `${rows.length} 只候选 · 按评分排序` : "暂无匹配";
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7">调整价格、板块或风险条件后再试</td></tr>`;
+    return;
+  }
+  rows.slice(0, 12).forEach((item) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.code}</td>
+      <td>${item.name}</td>
+      <td>${item.sector}</td>
+      <td>${quoteText(item.code)}</td>
+      <td>${item.score}</td>
+      <td>${item.reason}</td>
+      <td><button class="stock-action" data-code="${item.code}" data-name="${item.name}" type="button">分析</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+async function fetchQuotes(codes) {
+  const unique = [...new Set(codes.filter(Boolean))].slice(0, 40);
+  if (!unique.length) return [];
+  const payload = await fetchJSON(`/api/quotes?codes=${encodeURIComponent(unique.join(","))}`);
+  const items = payload.items || [];
+  items.forEach((item) => {
+    if (item.code && !item.error) {
+      state.quotes[item.code] = item;
+    }
+  });
+  return items;
+}
+
+async function refreshCandidateQuotes(recommendationLimit = 10, sectorLimit = 8) {
+  const codes = buildRecommendationRows()
+    .map((item) => item.code)
+    .slice(0, recommendationLimit);
+  const selected = sectorThemes.find((theme) => theme.id === state.selectedSector);
+  if (selected) {
+    selected.companies.slice(0, sectorLimit).forEach(([code]) => codes.push(code));
+  }
+  $("recommendationSummary").textContent = "正在刷新候选价格...";
+  await fetchQuotes(codes);
+  renderSectorCompanies(sectorThemes.find((theme) => theme.id === state.selectedSector));
+  renderRecommendations();
+  applyStockFilter();
 }
 
 function showPage(page) {
@@ -730,6 +938,63 @@ async function runAIAnalysis() {
     $("aiMonitorStatus").textContent = "AI 调用失败";
   } finally {
     $("aiAnalyzeBtn").disabled = false;
+  }
+}
+
+async function runAISectorScan() {
+  $("aiSectorBtn").disabled = true;
+  $("aiSectorStatus").textContent = "AI 研判中...";
+  $("aiSectorInsight").textContent = "正在刷新价格并生成本月板块研判...";
+  try {
+    await refreshCandidateQuotes();
+    const filters = getDiscoveryFilters();
+    const themes = sectorThemes
+      .filter((theme) => themeMatchesFilters(theme, filters))
+      .map((theme) => ({
+        name: theme.name,
+        heat: theme.heat,
+        risk: theme.risk,
+        catalyst: theme.catalyst,
+        source: theme.source,
+      }));
+    const candidates = state.recommendations.slice(0, 10).map((item) => ({
+      code: item.code,
+      name: item.name,
+      sector: item.sector,
+      price: item.quote?.price || null,
+      changePct: item.quote?.changePct || null,
+      score: item.score,
+      reason: item.reason,
+      risk: item.risk,
+    }));
+    const payload = await fetchJSON("/api/ai/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "A股",
+        name: "本月板块与候选股",
+        mode: "sector",
+        context: {
+          generatedAt: new Date().toISOString(),
+          filters,
+          monthMarketNotes,
+          themes,
+          candidates,
+          discipline: [
+            "优先风险控制，不把题材热度直接等同于买入信号",
+            "价格筛选只作为资金门槛，最终需要回测、趋势、流动性和止损共同确认",
+            "不能使用上下文之外的未来行情",
+          ],
+        },
+      }),
+    });
+    $("aiSectorInsight").textContent = payload.content || "AI 未返回内容";
+    $("aiSectorStatus").textContent = `${payload.model || state.aiConfig?.model || "AI"} · 已更新`;
+  } catch (err) {
+    $("aiSectorInsight").textContent = `AI 更新失败：${err.message}`;
+    $("aiSectorStatus").textContent = "更新失败";
+  } finally {
+    $("aiSectorBtn").disabled = false;
   }
 }
 
@@ -1138,6 +1403,11 @@ $("stockTableBody").addEventListener("click", (event) => {
   if (!button) return;
   selectStock(button.dataset.code, button.dataset.name);
 });
+$("recommendationBody").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-code]");
+  if (!button) return;
+  selectStock(button.dataset.code, button.dataset.name);
+});
 $("sectorCompanyBody").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-code]");
   if (!button) return;
@@ -1169,6 +1439,14 @@ $("addWatchBtn").addEventListener("click", () => {
 $("startMonitorBtn").addEventListener("click", startMonitor);
 $("stopMonitorBtn").addEventListener("click", stopMonitor);
 $("aiAnalyzeBtn").addEventListener("click", runAIAnalysis);
+$("applyDiscoveryBtn").addEventListener("click", () => applyDiscoveryFilters(false));
+$("refreshPricesBtn").addEventListener("click", () => refreshCandidateQuotes().catch((err) => {
+  $("recommendationSummary").textContent = `价格刷新失败：${err.message}`;
+}));
+$("aiSectorBtn").addEventListener("click", runAISectorScan);
+["sectorFilterSelect", "minPriceInput", "maxPriceInput", "riskFilterSelect", "minHeatInput"].forEach((id) => {
+  $(id).addEventListener("change", () => applyDiscoveryFilters(false));
+});
 
 const initialParams = new URLSearchParams(window.location.search);
 const initialCode = initialParams.get("code");

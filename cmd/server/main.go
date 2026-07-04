@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	localai "adata-backtest-lab/internal/ai"
@@ -42,6 +43,7 @@ func main() {
 	mux.HandleFunc("/api/health", a.handleHealth)
 	mux.HandleFunc("/api/stocks", a.handleStocks)
 	mux.HandleFunc("/api/market", a.handleMarket)
+	mux.HandleFunc("/api/quotes", a.handleQuotes)
 	mux.HandleFunc("/api/backtest", a.handleBacktest)
 	mux.HandleFunc("/api/ai/config", a.handleAIConfig)
 	mux.HandleFunc("/api/ai/analyze", a.handleAIAnalyze)
@@ -82,6 +84,65 @@ func (a *app) handleMarket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"bars": bars})
+}
+
+func (a *app) handleQuotes(w http.ResponseWriter, r *http.Request) {
+	raw := strings.TrimSpace(r.URL.Query().Get("codes"))
+	if raw == "" {
+		writeError(w, errors.New("codes is required"))
+		return
+	}
+	parts := strings.Split(raw, ",")
+	seen := make(map[string]bool)
+	codes := make([]string, 0, len(parts))
+	for _, part := range parts {
+		code := strings.TrimSpace(part)
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		codes = append(codes, code)
+		if len(codes) >= 40 {
+			break
+		}
+	}
+	start := time.Now().AddDate(0, -6, 0).Format("2006-01-02")
+	type quote struct {
+		Code      string  `json:"code"`
+		Date      string  `json:"date"`
+		Price     float64 `json:"price"`
+		ChangePct float64 `json:"changePct"`
+		Error     string  `json:"error,omitempty"`
+	}
+	items := make([]quote, len(codes))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+	for index, code := range codes {
+		wg.Add(1)
+		go func(index int, code string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			bars, err := a.provider.Market(code, start, "", 1)
+			if err != nil {
+				items[index] = quote{Code: code, Error: err.Error()}
+				return
+			}
+			last := bars[len(bars)-1]
+			changePct := last.ChangePct
+			if changePct == 0 && len(bars) > 1 && bars[len(bars)-2].Close > 0 {
+				changePct = (last.Close/bars[len(bars)-2].Close - 1) * 100
+			}
+			items[index] = quote{
+				Code:      code,
+				Date:      last.Date,
+				Price:     last.Close,
+				ChangePct: changePct,
+			}
+		}(index, code)
+	}
+	wg.Wait()
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (a *app) handleBacktest(w http.ResponseWriter, r *http.Request) {

@@ -169,6 +169,20 @@ func BuildPrompt(req AnalysisRequest) (string, string, error) {
 		return "", "", fmt.Errorf("encode analysis context: %w", err)
 	}
 	system := "你是A股量化交易与风控分析助手。只基于用户提供的数据做研究型分析，不承诺收益，不编造实时新闻，不把未来数据当作已知事实。输出要短、可执行、先风险后机会。"
+	if mode == "sector" {
+		user := fmt.Sprintf(`请对 %s %s 做本月板块趋势和候选股筛选。
+
+要求：
+1. 先给出本月主线判断：哪些板块适合继续观察，哪些属于拥挤或兑现风险。
+2. 根据用户价格范围、板块偏好、风险偏好和候选股评分，给出优先观察名单。
+3. 明确说明：哪些只能观察，哪些可以进入回测，哪些不能追高。
+4. 不允许编造上下文之外的新闻；所有结论只能来自结构化上下文。
+5. 输出包括“本月方向、优先候选、回避条件、下一步动作”，不要超过650字。
+
+结构化上下文：
+%s`, code, strings.TrimSpace(req.Name), string(contextJSON))
+		return system, user, nil
+	}
 	user := fmt.Sprintf(`请对 %s %s 做%s分析。
 
 要求：
@@ -189,6 +203,8 @@ func modeLabel(mode string) string {
 		return "实时盯盘"
 	case "review":
 		return "盘后复盘"
+	case "sector":
+		return "本月板块趋势与自动选股"
 	default:
 		return mode
 	}

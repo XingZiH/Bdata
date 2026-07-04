@@ -96,15 +96,82 @@
         <section id="stockPage" class="page-view stock-page">
           <div class="stock-hero">
             <div>
-              <span class="eyebrow">板块选股入口</span>
-              <h3>先找本月有催化的板块，再找板块里的公司</h3>
-              <p>按月度热度、新闻事件、风险拥挤度整理主题；点板块后直接筛出相关公司，再进入回测工作台。</p>
+              <span class="eyebrow">智能选股</span>
+              <h3>从热门方向里找价格合适的股票</h3>
+              <p>输入价格范围和偏好的板块，系统会筛出候选公司，并用 AI 结合本月行情和新闻催化做二次判断。</p>
             </div>
             <div class="stock-search">
               <input id="stockSearchInput" autocomplete="off" placeholder="搜索代码 / 名称 / SH / SZ" />
               <button id="stockRefreshBtn" type="button">刷新列表</button>
             </div>
           </div>
+
+          <section class="discovery-filter">
+            <div class="filter-grid">
+              <label>
+                目标板块
+                <select id="sectorFilterSelect"></select>
+              </label>
+              <label>
+                最低价
+                <input id="minPriceInput" type="number" min="0" step="0.01" placeholder="不限" />
+              </label>
+              <label>
+                最高价
+                <input id="maxPriceInput" type="number" min="0" step="0.01" value="40" />
+              </label>
+              <label>
+                风险偏好
+                <select id="riskFilterSelect">
+                  <option value="">全部</option>
+                  <option value="low">稳健优先</option>
+                  <option value="medium">均衡</option>
+                  <option value="high">高弹性</option>
+                </select>
+              </label>
+              <label>
+                最低热度
+                <input id="minHeatInput" type="number" min="0" max="100" value="70" />
+              </label>
+            </div>
+            <div class="filter-actions">
+              <button id="applyDiscoveryBtn" type="button">筛选股票</button>
+              <button id="refreshPricesBtn" type="button">刷新候选价格</button>
+              <button id="aiSectorBtn" type="button">AI 更新本月方向</button>
+            </div>
+          </section>
+
+          <section class="recommendation-layout">
+            <div class="stock-table-card">
+              <div class="card-head">
+                <h3>主动推荐</h3>
+                <span id="recommendationSummary">等待筛选</span>
+              </div>
+              <div class="table-wrap recommendation-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>代码</th>
+                      <th>名称</th>
+                      <th>板块</th>
+                      <th>价格</th>
+                      <th>评分</th>
+                      <th>理由</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recommendationBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="sector-panel">
+              <div class="card-head">
+                <h3>AI 月度研判</h3>
+                <span id="aiSectorStatus">等待更新</span>
+              </div>
+              <div id="aiSectorInsight" class="ai-sector-insight">先筛选股票，再让 AI 结合本月行情、新闻事件和价格约束做研判。</div>
+            </div>
+          </section>
 
           <section class="sector-layout">
             <div class="sector-panel">
@@ -135,6 +202,7 @@
                     <th>代码</th>
                     <th>名称</th>
                     <th>市场</th>
+                    <th>价格</th>
                     <th>匹配原因</th>
                     <th>操作</th>
                   </tr>
@@ -156,6 +224,7 @@
                     <th>代码</th>
                     <th>名称</th>
                     <th>市场</th>
+                    <th>价格</th>
                     <th>操作</th>
                   </tr>
                 </thead>

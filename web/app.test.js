@@ -40,3 +40,16 @@ test("provides local AI monitor controls and analysis flow", () => {
   assert.match(js, /function refreshWatchlist/);
   assert.match(js, /\/api\/ai\/analyze/);
 });
+
+test("provides user-facing sector filters, prices, and AI stock recommendations", () => {
+  assert.match(html, /id="sectorFilterSelect"/);
+  assert.match(html, /id="maxPriceInput"/);
+  assert.match(html, /id="riskFilterSelect"/);
+  assert.match(html, /id="aiSectorBtn"/);
+  assert.match(html, /id="recommendationBody"/);
+  assert.match(html, /id="aiSectorInsight"/);
+  assert.match(js, /function applyDiscoveryFilters/);
+  assert.match(js, /function refreshCandidateQuotes/);
+  assert.match(js, /function runAISectorScan/);
+  assert.match(js, /function renderRecommendations/);
+});
