@@ -96,9 +96,9 @@
         <section id="stockPage" class="page-view stock-page">
           <div class="stock-hero">
             <div>
-              <span class="eyebrow">在线股票池</span>
-              <h3>从全市场列表选择标的，再进入回测工作台</h3>
-              <p>支持按代码、名称、交易所搜索。点击“分析”后会自动带入参数并拉取行情。</p>
+              <span class="eyebrow">板块选股入口</span>
+              <h3>先找本月有催化的板块，再找板块里的公司</h3>
+              <p>按月度热度、新闻事件、风险拥挤度整理主题；点板块后直接筛出相关公司，再进入回测工作台。</p>
             </div>
             <div class="stock-search">
               <input id="stockSearchInput" autocomplete="off" placeholder="搜索代码 / 名称 / SH / SZ" />
@@ -106,9 +106,47 @@
             </div>
           </div>
 
+          <section class="sector-layout">
+            <div class="sector-panel">
+              <div class="card-head">
+                <h3>本月热门板块</h3>
+                <span>按热度优先</span>
+              </div>
+              <div id="hotSectorGrid" class="sector-grid"></div>
+            </div>
+            <div class="sector-panel">
+              <div class="card-head">
+                <h3>新闻事件驱动</h3>
+                <span>按催化来源</span>
+              </div>
+              <div id="newsSectorGrid" class="event-grid"></div>
+            </div>
+          </section>
+
           <div class="stock-table-card">
             <div class="card-head">
-              <h3>股票列表</h3>
+              <h3 id="sectorCompanyTitle">板块公司池</h3>
+              <span id="sectorCompanyCount">先选择板块</span>
+            </div>
+            <div class="table-wrap sector-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>市场</th>
+                    <th>匹配原因</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="sectorCompanyBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="stock-table-card">
+            <div class="card-head">
+              <h3>全市场股票列表</h3>
               <span id="stockCount">--</span>
             </div>
             <div class="table-wrap stock-table-wrap">

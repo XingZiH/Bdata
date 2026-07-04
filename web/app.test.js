@@ -20,3 +20,14 @@ test("provides a persistent dark theme toggle", () => {
   assert.match(js, /localStorage\.setItem\("adata-theme"/);
   assert.match(js, /document\.documentElement\.dataset\.theme/);
 });
+
+test("provides sector discovery from hot themes and news events", () => {
+  assert.match(html, /id="hotSectorGrid"/);
+  assert.match(html, /id="newsSectorGrid"/);
+  assert.match(html, /id="sectorCompanyBody"/);
+  assert.match(js, /const sectorThemes = /);
+  assert.match(js, /sourceUrl/);
+  assert.match(js, /class="source-link"/);
+  assert.match(js, /function selectSector/);
+  assert.match(js, /function renderSectorCompanies/);
+});

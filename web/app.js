@@ -4,9 +4,195 @@ const state = {
   stocks: [],
   filteredStocks: [],
   currentPage: "stock",
+  selectedSector: "",
 };
 
 const $ = (id) => document.getElementById(id);
+
+const sectorThemes = [
+  {
+    id: "robotics",
+    type: "hot",
+    name: "机器人 / 具身智能",
+    heat: 96,
+    risk: "高波动",
+    catalyst: "7月3日机器人板块持续上攻，宇树链、T链和优必选概念活跃。",
+    source: "东方财富热门股追踪",
+    sourceUrl: "https://stock.eastmoney.com/a/cggdj.html",
+    companies: [
+      ["002747", "埃斯顿", "机器人涨停潮核心标的"],
+      ["002979", "雷赛智能", "运动控制和机器人链"],
+      ["002472", "双环传动", "减速器和机器人执行端"],
+      ["688017", "绿的谐波", "谐波减速器"],
+      ["300124", "汇川技术", "工业自动化"],
+      ["002896", "中大力德", "减速器和驱动系统"],
+      ["603728", "鸣志电器", "控制电机"],
+      ["002031", "巨轮智能", "机器人概念"],
+    ],
+  },
+  {
+    id: "ai-compute",
+    type: "hot",
+    name: "AI 算力 / 半导体",
+    heat: 92,
+    risk: "拥挤度高",
+    catalyst: "7月策略仍看好国产算力；半导体、光模块、AI算力链是市场核心主线，但短线波动加大。",
+    source: "证券时报7月策略 / 新浪财经",
+    sourceUrl: "https://www.stcn.com/article/detail/3993850.html",
+    companies: [
+      ["300308", "中际旭创", "光模块"],
+      ["300502", "新易盛", "高速光模块"],
+      ["300394", "天孚通信", "光通信器件"],
+      ["002281", "光迅科技", "光通信"],
+      ["002371", "北方华创", "半导体设备"],
+      ["688012", "中微公司", "半导体设备"],
+      ["300223", "北京君正", "存储芯片涨价线索"],
+      ["603986", "兆易创新", "存储与MCU"],
+      ["688981", "中芯国际", "晶圆制造"],
+      ["300604", "长川科技", "测试设备"],
+    ],
+  },
+  {
+    id: "aerospace-defense",
+    type: "hot",
+    name: "军工 / 商业航天",
+    heat: 88,
+    risk: "事件驱动",
+    catalyst: "商业航天、军用无人机、导弹和地面无人装备等方向被机构看好。",
+    source: "证券时报",
+    sourceUrl: "https://www.stcn.com/article/detail/3997487.html",
+    companies: [
+      ["000547", "航天发展", "商业航天和军工信息化"],
+      ["600118", "中国卫星", "卫星制造"],
+      ["600760", "中航沈飞", "航空装备"],
+      ["000768", "中航西飞", "航空装备"],
+      ["300034", "钢研高纳", "高温合金"],
+      ["300775", "三角防务", "航空锻件"],
+      ["002025", "航天电器", "军工连接器"],
+      ["688297", "中无人机", "无人机装备"],
+      ["300474", "景嘉微", "军工芯片"],
+    ],
+  },
+  {
+    id: "metals-gold",
+    type: "hot",
+    name: "有色金属 / 黄金",
+    heat: 84,
+    risk: "跟随商品",
+    catalyst: "7月策略关注资源安全与能源体系重构；黄金股受海外就业和利率预期扰动活跃。",
+    source: "证券时报 / 新浪港股",
+    sourceUrl: "https://www.xincai.com/article/nifpkay3629866",
+    companies: [
+      ["601899", "紫金矿业", "铜金资源龙头"],
+      ["600547", "山东黄金", "黄金"],
+      ["600489", "中金黄金", "黄金"],
+      ["600988", "赤峰黄金", "黄金弹性"],
+      ["000630", "铜陵有色", "铜"],
+      ["000807", "云铝股份", "铝"],
+      ["002466", "天齐锂业", "锂资源"],
+      ["002460", "赣锋锂业", "锂资源"],
+      ["603799", "华友钴业", "钴镍材料"],
+    ],
+  },
+  {
+    id: "innovative-drug",
+    type: "hot",
+    name: "创新药 / 医药反弹",
+    heat: 80,
+    risk: "分化明显",
+    catalyst: "医药股近期反弹，创新药商业化和出海逻辑继续被资金关注。",
+    source: "东方财富股票频道 / 新浪港股",
+    sourceUrl: "https://stock.eastmoney.com/",
+    companies: [
+      ["688235", "百济神州", "创新药龙头"],
+      ["688331", "荣昌生物", "创新药反弹"],
+      ["600276", "恒瑞医药", "创新药"],
+      ["603259", "药明康德", "CXO"],
+      ["300759", "康龙化成", "CXO"],
+      ["300347", "泰格医药", "临床CRO"],
+      ["688180", "君实生物", "创新药"],
+      ["688266", "泽璟制药", "创新药"],
+    ],
+  },
+  {
+    id: "dividend",
+    type: "hot",
+    name: "高股息 / 红利防守",
+    heat: 76,
+    risk: "进攻性弱",
+    catalyst: "成长拥挤度较高时，高股息板块具备防御底仓价值。",
+    source: "新浪财经",
+    sourceUrl: "https://www.xincai.com/article/nifkyvw5888105",
+    companies: [
+      ["601398", "工商银行", "银行红利"],
+      ["601288", "农业银行", "银行红利"],
+      ["601988", "中国银行", "银行红利"],
+      ["600900", "长江电力", "电力红利"],
+      ["601088", "中国神华", "煤炭红利"],
+      ["600028", "中国石化", "能源红利"],
+      ["601006", "大秦铁路", "交运红利"],
+      ["600886", "国投电力", "电力红利"],
+      ["600019", "宝钢股份", "钢铁红利"],
+    ],
+  },
+  {
+    id: "glass-substrate",
+    type: "news",
+    name: "玻璃基板 / 先进封装",
+    heat: 74,
+    risk: "题材兑现",
+    catalyst: "同花顺概念板块显示玻璃基板有近期驱动事件，先进封装链条延续关注。",
+    source: "同花顺概念板块",
+    sourceUrl: "https://q.10jqka.com.cn/gn/",
+    companies: [
+      ["000725", "京东方A", "显示面板"],
+      ["000050", "深天马A", "显示面板"],
+      ["002384", "东山精密", "PCB/消费电子"],
+      ["600183", "生益科技", "覆铜板"],
+      ["600703", "三安光电", "化合物半导体"],
+      ["002456", "欧菲光", "消费电子"],
+      ["300433", "蓝思科技", "消费电子玻璃"],
+    ],
+  },
+  {
+    id: "solid-battery",
+    type: "news",
+    name: "固态电池 / 新能源",
+    heat: 72,
+    risk: "产业验证",
+    catalyst: "固态电池持续火热，新能源车政策和材料链事件带来交易线索。",
+    source: "证券时报电池新国标",
+    sourceUrl: "https://www.stcn.com/article/detail/3994407.html",
+    companies: [
+      ["300750", "宁德时代", "动力电池"],
+      ["002594", "比亚迪", "新能源车"],
+      ["002074", "国轩高科", "动力电池"],
+      ["300014", "亿纬锂能", "锂电池"],
+      ["002709", "天赐材料", "电解液"],
+      ["300073", "当升科技", "正极材料"],
+      ["002460", "赣锋锂业", "固态电池/锂"],
+      ["002466", "天齐锂业", "锂资源"],
+    ],
+  },
+  {
+    id: "earnings-preview",
+    type: "news",
+    name: "中报预增 / 业绩验证",
+    heat: 70,
+    risk: "财报落地",
+    catalyst: "7月进入中报季，市场从景气预期转向景气确认，业绩能验证的方向更容易留住资金。",
+    source: "证券时报",
+    sourceUrl: "https://www.stcn.com/article/detail/3993850.html",
+    companies: [
+      ["300223", "北京君正", "存储涨价与盈利弹性"],
+      ["300308", "中际旭创", "AI算力业绩验证"],
+      ["300502", "新易盛", "AI算力业绩验证"],
+      ["002384", "东山精密", "消费电子/PCB"],
+      ["002472", "双环传动", "机器人链"],
+      ["601899", "紫金矿业", "资源品"],
+    ],
+  },
+];
 
 function pct(value, digits = 2) {
   if (!Number.isFinite(value)) return "--";
@@ -84,6 +270,12 @@ async function loadStocks(query = "", limit = 5000) {
   state.stocks = items;
   fillDatalist(items);
   applyStockFilter();
+  renderSectorCards();
+  if (!state.selectedSector && sectorThemes.length) {
+    selectSector(sectorThemes[0].id);
+  } else if (state.selectedSector) {
+    renderSectorCompanies(sectorThemes.find((theme) => theme.id === state.selectedSector));
+  }
   status(`股票列表已加载：${items.length} 只，可搜索后选择分析`);
 }
 
@@ -126,6 +318,90 @@ function renderStockTable(items) {
     `;
     body.appendChild(tr);
   });
+}
+
+function renderSectorCards() {
+  renderThemeCards(
+    "hotSectorGrid",
+    sectorThemes.filter((theme) => theme.type === "hot")
+  );
+  renderThemeCards(
+    "newsSectorGrid",
+    sectorThemes.filter((theme) => theme.type === "news")
+  );
+}
+
+function renderThemeCards(targetId, themes) {
+  const box = $(targetId);
+  box.innerHTML = "";
+  themes.forEach((theme) => {
+    const card = document.createElement("article");
+    card.className = `sector-card ${theme.type === "news" ? "event-card" : ""} ${
+      state.selectedSector === theme.id ? "active" : ""
+    }`;
+    card.innerHTML = `
+      <h4>${theme.name}</h4>
+      <p>${theme.catalyst}</p>
+      <div class="sector-meta">
+        <span class="tag hot">热度 ${theme.heat}</span>
+        <span class="tag risk">${theme.risk}</span>
+      </div>
+      <div class="sector-actions">
+        <a class="source-link" href="${theme.sourceUrl}" target="_blank" rel="noopener">来源：${theme.source}</a>
+        <button class="sector-select" data-sector="${theme.id}" type="button">查看公司池</button>
+      </div>
+    `;
+    box.appendChild(card);
+  });
+}
+
+function selectSector(id) {
+  const theme = sectorThemes.find((item) => item.id === id);
+  if (!theme) return;
+  state.selectedSector = id;
+  renderSectorCards();
+  renderSectorCompanies(theme);
+  status(`已选择板块：${theme.name}，可从公司池直接进入回测`);
+}
+
+function renderSectorCompanies(theme) {
+  const body = $("sectorCompanyBody");
+  if (!theme) {
+    $("sectorCompanyTitle").textContent = "板块公司池";
+    $("sectorCompanyCount").textContent = "先选择板块";
+    body.innerHTML = `<tr><td colspan="5">先选择一个热门板块或新闻事件</td></tr>`;
+    return;
+  }
+  const stockMap = new Map(state.stocks.map((item) => [item.code, item]));
+  const rows = theme.companies.map(([code, fallbackName, reason]) => {
+    const stock = stockMap.get(code);
+    return {
+      code,
+      name: stock?.name || fallbackName,
+      exchange: stock?.exchange || inferExchange(code),
+      reason,
+    };
+  });
+  $("sectorCompanyTitle").textContent = `${theme.name} · 公司池`;
+  $("sectorCompanyCount").textContent = `${rows.length} 家候选 · 热度 ${theme.heat} · ${theme.risk}`;
+  body.innerHTML = "";
+  rows.forEach((item) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.code}</td>
+      <td>${item.name}</td>
+      <td>${item.exchange}</td>
+      <td>${item.reason}</td>
+      <td><button class="stock-action" data-code="${item.code}" data-name="${item.name}" type="button">分析</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function inferExchange(code) {
+  if (code.startsWith("6")) return "SH";
+  if (code.startsWith("8") || code.startsWith("9")) return "BJ";
+  return "SZ";
 }
 
 function showPage(page) {
@@ -593,6 +869,18 @@ $("stockTableBody").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-code]");
   if (!button) return;
   selectStock(button.dataset.code, button.dataset.name);
+});
+$("sectorCompanyBody").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-code]");
+  if (!button) return;
+  selectStock(button.dataset.code, button.dataset.name);
+});
+["hotSectorGrid", "newsSectorGrid"].forEach((id) => {
+  $(id).addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-sector]");
+    if (!button) return;
+    selectSector(button.dataset.sector);
+  });
 });
 
 const initialParams = new URLSearchParams(window.location.search);
