@@ -5,7 +5,8 @@ server.out.log
 
 # Local screenshots and browser profiles
 ui-screenshot*.png
-.edge-profile-shot/
+ui-*.png
+.edge-profile*/
 
 # Go build output
 *.exe

@@ -3,6 +3,10 @@
   --bg: #f4f6fa;
   --surface: #ffffff;
   --surface-soft: #f8fafc;
+  --sidebar: #fbfcff;
+  --input-bg: #ffffff;
+  --button-bg: #ffffff;
+  --button-hover: #9ab0c7;
   --line: #dfe5ee;
   --grid: #e9eef5;
   --ink: #17202c;
@@ -15,7 +19,37 @@
   --red-soft: #fbeceb;
   --gold: #a47d1a;
   --gold-soft: #f8f1dd;
+  --violet: #8b5cf6;
+  --inverse: #ffffff;
+  --row-hover: #f1f5f9;
   --shadow: 0 10px 24px rgba(20, 32, 50, 0.08);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1520;
+  --surface: #151d2a;
+  --surface-soft: #111925;
+  --sidebar: #0b111b;
+  --input-bg: #0f1724;
+  --button-bg: #151d2a;
+  --button-hover: #4b6b88;
+  --line: #263449;
+  --grid: #223047;
+  --ink: #e6edf7;
+  --muted: #9aa8bc;
+  --blue: #4ba3c7;
+  --blue-soft: #102b39;
+  --green: #4ab27f;
+  --green-soft: #0f2b22;
+  --red: #ef6b64;
+  --red-soft: #351817;
+  --gold: #d7aa3f;
+  --gold-soft: #322813;
+  --violet: #a78bfa;
+  --inverse: #07111d;
+  --row-hover: #1d2938;
+  --shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
 }
 
 * {
@@ -39,13 +73,13 @@ button {
   min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--surface);
+  background: var(--button-bg);
   color: var(--ink);
   cursor: pointer;
 }
 
 button:hover {
-  border-color: #9ab0c7;
+  border-color: var(--button-hover);
 }
 
 button:disabled {
@@ -61,7 +95,7 @@ button:disabled {
 
 .sidebar {
   border-right: 1px solid var(--line);
-  background: #fbfcff;
+  background: var(--sidebar);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -82,7 +116,7 @@ button:disabled {
   display: grid;
   place-items: center;
   background: var(--blue);
-  color: #fff;
+  color: var(--inverse);
   font-weight: 800;
   font-size: 21px;
 }
@@ -121,6 +155,22 @@ button:disabled {
   padding: 14px;
 }
 
+.main-menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.main-menu button {
+  font-weight: 700;
+}
+
+.main-menu button.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--inverse);
+}
+
 .panel h2 {
   margin: 0 0 12px;
   font-size: 14px;
@@ -141,7 +191,7 @@ input {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 7px 9px;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--ink);
 }
 
@@ -161,7 +211,7 @@ input {
   width: 100%;
   background: var(--blue);
   border-color: var(--blue);
-  color: #fff;
+  color: var(--inverse);
   font-weight: 700;
 }
 
@@ -206,6 +256,67 @@ input {
 
 .toolbar button {
   padding: 0 12px;
+}
+
+.page-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.stock-hero {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 0.75fr);
+  gap: 16px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.stock-hero h3 {
+  margin: 4px 0 6px;
+  font-size: 24px;
+}
+
+.stock-hero p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.stock-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+}
+
+.stock-table-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.stock-table-wrap {
+  max-height: calc(100vh - 250px);
+}
+
+.stock-action {
+  min-height: 30px;
+  padding: 0 10px;
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .advice-board {
@@ -286,17 +397,17 @@ input {
 
 .level-grid .buy {
   background: var(--green-soft);
-  border-color: #b7dfc8;
+  border-color: var(--green);
 }
 
 .level-grid .risk {
   background: var(--red-soft);
-  border-color: #f0bbb7;
+  border-color: var(--red);
 }
 
 .level-grid .profit {
   background: var(--gold-soft);
-  border-color: #e9d58e;
+  border-color: var(--gold);
 }
 
 .metrics {
@@ -423,6 +534,10 @@ th {
   top: 0;
 }
 
+tbody tr:hover {
+  background: var(--row-hover);
+}
+
 .positive {
   color: var(--red);
 }
@@ -442,6 +557,10 @@ th {
   }
 
   .insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-hero {
     grid-template-columns: 1fr;
   }
 }
@@ -490,6 +609,10 @@ th {
   }
 
   .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-search {
     grid-template-columns: 1fr;
   }
 

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -44,13 +45,11 @@ def run_stocks(_: argparse.Namespace) -> None:
     if east:
         emit({"items": east, "source": "eastmoney-fast-list"})
         return
-    if os.environ.get("ADATA_SLOW_STOCK_LIST") != "1":
-        emit({"items": fallback_stocks(), "source": "fallback-fast-list"})
-        return
     try:
         import adata
 
-        df = adata.stock.info.all_code()
+        with contextlib.redirect_stdout(sys.stderr):
+            df = adata.stock.info.all_code()
         if df is None or df.empty:
             emit({"items": fallback_stocks(), "source": "fallback"})
             return
@@ -104,7 +103,8 @@ def run_market(args: argparse.Namespace) -> None:
     try:
         import adata
 
-        df = adata.stock.market.get_market(stock_code=code, start_date=args.start, k_type=args.ktype)
+        with contextlib.redirect_stdout(sys.stderr):
+            df = adata.stock.market.get_market(stock_code=code, start_date=args.start, k_type=args.ktype)
         if df is not None and not df.empty:
             if args.end:
                 df = df[df["trade_date"].astype(str) <= args.end]

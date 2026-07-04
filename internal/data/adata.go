@@ -47,8 +47,11 @@ func (p *ADataProvider) Stocks(query string, limit int) ([]Stock, error) {
 	}
 
 	query = strings.TrimSpace(strings.ToLower(query))
-	if limit <= 0 || limit > 1000 {
-		limit = 200
+	if limit <= 0 {
+		limit = 500
+	}
+	if limit > 6000 {
+		limit = 6000
 	}
 	out := make([]Stock, 0, limit)
 	for _, item := range p.stockCached {
