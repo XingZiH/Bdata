@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AData 股票回测工作台</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">A</div>
+          <div>
+            <h1>AData 股票回测</h1>
+            <p>在线行情 · K线 · 训练 · 决策</p>
+          </div>
+        </div>
+
+        <section class="panel">
+          <h2>标的与数据</h2>
+          <label>
+            股票代码
+            <div class="search-row">
+              <input id="codeInput" value="002185" list="stockList" autocomplete="off" />
+              <button id="searchBtn" title="搜索股票">搜索</button>
+            </div>
+          </label>
+          <datalist id="stockList"></datalist>
+          <label>
+            开始日期
+            <input id="startInput" type="date" value="2024-01-01" />
+          </label>
+          <label>
+            结束日期
+            <input id="endInput" type="date" />
+          </label>
+        </section>
+
+        <section class="panel">
+          <h2>策略参数</h2>
+          <div class="two-col">
+            <label>
+              快线
+              <input id="fastInput" type="number" min="2" max="60" value="5" />
+            </label>
+            <label>
+              慢线
+              <input id="slowInput" type="number" min="5" max="180" value="20" />
+            </label>
+          </div>
+          <label>
+            可用资金
+            <input id="cashInput" type="number" min="1000" step="100" value="1500" />
+          </label>
+          <div class="two-col">
+            <label>
+              费率
+              <input id="feeInput" type="number" min="0" step="0.0001" value="0.0003" />
+            </label>
+            <label>
+              滑点
+              <input id="slippageInput" type="number" min="0" step="0.0001" value="0.0005" />
+            </label>
+          </div>
+          <label>
+            预测天数
+            <input id="horizonInput" type="number" min="1" max="10" value="3" />
+          </label>
+          <button class="primary" id="runBtn">运行回测与预测</button>
+        </section>
+
+        <section class="panel compact">
+          <h2>回测口径</h2>
+          <p>信号在收盘确认，成交在下一交易日开盘模拟；预测使用历史相似样本和 walk-forward 检验，不把未来收益写入特征。</p>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <h2 id="pageTitle">002185 · 华天科技</h2>
+            <p id="statusText">等待运行</p>
+          </div>
+          <div class="toolbar">
+            <button id="sampleHuatian">华天科技</button>
+            <button id="sampleTaiji">太极集团</button>
+            <button id="samplePingan">平安银行</button>
+          </div>
+        </header>
+
+        <section class="advice-board" id="adviceBoard">
+          <div class="advice-main">
+            <span class="eyebrow">当前动作</span>
+            <strong id="actionLabel">--</strong>
+            <p id="positionHint">运行回测后生成买入区、确认线、止损和止盈计划。</p>
+          </div>
+          <div class="confidence-box">
+            <span>信号可信度</span>
+            <strong id="confidenceValue">--</strong>
+            <small id="scoreBreakdown">趋势 -- / 风险 -- / 预测 --</small>
+          </div>
+          <div class="order-box">
+            <span>建议下单</span>
+            <strong id="suggestedShares">--</strong>
+            <small id="estimatedCost">预计占用 --</small>
+          </div>
+        </section>
+
+        <section class="level-grid">
+          <article><span>最新收盘</span><strong id="lastCloseValue">--</strong></article>
+          <article class="buy"><span>买入区</span><strong id="buyZoneValue">--</strong></article>
+          <article><span>确认线</span><strong id="confirmValue">--</strong></article>
+          <article><span>不追线</span><strong id="noChaseValue">--</strong></article>
+          <article class="risk"><span>止损线</span><strong id="stopValue">--</strong></article>
+          <article class="risk"><span>硬止损</span><strong id="hardStopValue">--</strong></article>
+          <article class="profit"><span>止盈目标</span><strong id="takeProfitValue">--</strong></article>
+          <article><span>风险收益比</span><strong id="rrValue">--</strong></article>
+        </section>
+
+        <section class="metrics" id="metricsGrid"></section>
+
+        <section class="insight-grid">
+          <div class="insight-card">
+            <div class="card-head compact-head">
+              <h3>分步操作</h3>
+              <span>按价格执行</span>
+            </div>
+            <ol id="entryPlanList"></ol>
+          </div>
+          <div class="insight-card">
+            <div class="card-head compact-head">
+              <h3>支持理由</h3>
+              <span>趋势 / 动能 / 预测</span>
+            </div>
+            <ul id="reasonList"></ul>
+          </div>
+          <div class="insight-card">
+            <div class="card-head compact-head">
+              <h3>风险提示</h3>
+              <span>先看风险</span>
+            </div>
+            <ul id="warningList"></ul>
+          </div>
+        </section>
+
+        <section class="chart-grid">
+          <div class="chart-card main-chart">
+            <div class="card-head">
+              <h3>K线与买卖区</h3>
+              <span>均线 · 布林 · 买卖标记</span>
+            </div>
+            <div id="kChart" class="chart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="card-head">
+              <h3>操作价位图</h3>
+              <span>买入 / 止损 / 止盈</span>
+            </div>
+            <div id="actionChart" class="chart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="card-head">
+              <h3>RSI 与 MACD</h3>
+              <span>动能确认</span>
+            </div>
+            <div id="indicatorChart" class="chart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="card-head">
+              <h3>净值与回撤</h3>
+              <span>回测曲线</span>
+            </div>
+            <div id="equityChart" class="chart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="card-head">
+              <h3>未来区间预测</h3>
+              <span>P20 / 均值 / P80</span>
+            </div>
+            <div id="forecastChart" class="chart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="card-head">
+              <h3>风险收益图</h3>
+              <span>单股盈亏阶梯</span>
+            </div>
+            <div id="riskChart" class="chart"></div>
+          </div>
+        </section>
+
+        <section class="table-card">
+          <div class="card-head">
+            <h3>交易明细</h3>
+            <span id="tradeSummary">--</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>买入日期</th>
+                  <th>卖出日期</th>
+                  <th>买入价</th>
+                  <th>卖出价</th>
+                  <th>收益</th>
+                  <th>盈亏</th>
+                  <th>持仓天数</th>
+                  <th>原因</th>
+                </tr>
+              </thead>
+              <tbody id="tradesBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
